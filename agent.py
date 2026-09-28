@@ -2,7 +2,7 @@ import inspect
 import json
 import os
 
-from openai import OpenAI
+from openai import OpenAI, BadRequestError
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -161,7 +161,8 @@ def execute_llm_call(conversation: List[Dict[str, str]]):
     response = openai_client.chat.completions.create(
         model="openai/gpt-oss-120b",
         messages=conversation,
-        max_completion_tokens=2000
+        max_completion_tokens=8000,
+        reasoning_effort="low",
     )
     return response.choices[0].message.content
 
@@ -184,7 +185,15 @@ def run_coding_agent_loop():
         iteration = 0
         while True:
             iteration += 1
-            assistant_response = execute_llm_call(conversation)
+            try:
+                assistant_response = execute_llm_call(conversation)
+            except BadRequestError as e:
+                log_trace(
+                    f"----- Iteracao {iteration} | ERRO (loop encerra) -----",
+                    f"A chamada ao modelo falhou: {e}",
+                    ASSISTANT_COLOR,
+                )
+                break
             tool_invocations = extract_tool_invocations(assistant_response)
 
             log_trace(
