@@ -9,7 +9,10 @@ from typing import Any, Dict, List, Tuple
 
 load_dotenv()
 
-openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+openai_client = OpenAI(
+    api_key=os.environ["GROQ_API_KEY"],
+    base_url="https://api.groq.com/openai/v1",
+)
 
 SYSTEM_PROMPT = """
 You are a coding assistant whose goal it is to help us solve coding tasks.
@@ -26,6 +29,17 @@ If no tool is needed, respond normally.
 YOU_COLOR = "\u001b[94m"
 ASSISTANT_COLOR = "\u001b[93m"
 RESET_COLOR = "\u001b[0m"
+
+THOUGHT_COLOR = "[96m"
+ACTION_COLOR = "[95m"
+OBSERVATION_COLOR = "[92m"
+
+TRACE_PATH = Path("trace.log")
+
+def log_trace(header: str, body: str, color: str = "") -> None:
+    print(f"{color}{header}{RESET_COLOR}\n{body}\n")
+    with open(TRACE_PATH, "a", encoding="utf-8") as f:
+        f.write(f"{header}\n{body}\n\n")
 
 def resolve_abs_path(path_str: str) -> Path:
     """
@@ -145,7 +159,7 @@ def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
 
 def execute_llm_call(conversation: List[Dict[str, str]]):
     response = openai_client.chat.completions.create(
-        model="gpt-5",
+        model="openai/gpt-oss-120b",
         messages=conversation,
         max_completion_tokens=2000
     )
@@ -166,20 +180,41 @@ def run_coding_agent_loop():
             "role": "user",
             "content": user_input.strip()
         })
+        log_trace("===== USER =====", user_input.strip(), YOU_COLOR)
+        iteration = 0
         while True:
+            iteration += 1
             assistant_response = execute_llm_call(conversation)
             tool_invocations = extract_tool_invocations(assistant_response)
+
+            log_trace(
+                f"----- Iteracao {iteration} | THOUGHT -----",
+                assistant_response,
+                THOUGHT_COLOR,
+            )
+
             if not tool_invocations:
-                print(f"{ASSISTANT_COLOR}Assistant:{RESET_COLOR}: {assistant_response}")
+                log_trace(
+                    f"----- Iteracao {iteration} | RESPOSTA FINAL (loop encerra) -----",
+                    assistant_response,
+                    ASSISTANT_COLOR,
+                )
                 conversation.append({
                     "role": "assistant",
                     "content": assistant_response
                 })
                 break
+
             for name, args in tool_invocations:
                 tool = TOOL_REGISTRY[name]
                 resp = ""
-                print(name, args)
+
+                log_trace(
+                    f"----- Iteracao {iteration} | ACTION -----",
+                    f"tool: {name}({json.dumps(args)})",
+                    ACTION_COLOR,
+                )
+
                 if name == "read_file":
                     resp = tool(args.get("filename", "."))
                 elif name == "list_files":
@@ -188,9 +223,18 @@ def run_coding_agent_loop():
                     resp = tool(args.get("path", "."),
                                 args.get("old_str", ""),
                                 args.get("new_str", ""))
+
+                tool_result_msg = f"tool_result({json.dumps(resp)})"
+
+                log_trace(
+                    f"----- Iteracao {iteration} | OBSERVATION -----",
+                    tool_result_msg,
+                    OBSERVATION_COLOR,
+                )
+
                 conversation.append({
                     "role": "user",
-                    "content": f"tool_result({json.dumps(resp)})"
+                    "content": tool_result_msg
                 })
 
 
