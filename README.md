@@ -50,7 +50,7 @@ O `agent.py` é uma simplificação de um AI Coding Agent. Ele foi implementado 
    ```
    Em `execute_llm_call`, troque o modelo:
    ```python
-   model="openai/gpt-oss-120b"
+   model="qwen/qwen3.8-27b"
    ```
    Use exatamente esse modelo, e não outro do Groq, para que as execuções da turma sejam comparáveis. Se der erro em `max_completion_tokens`, troque por `max_tokens`.
 
