@@ -168,7 +168,7 @@ def execute_llm_call(conversation: List[Dict[str, str]]):
     response = openai_client.chat.completions.create(
         model="qwen/qwen3.8-27b",
         messages=conversation,
-        max_completion_tokens=8000,
+        max_completion_tokens=1000,
         reasoning_effort="low",
     )
     return response.choices[0].message.content
